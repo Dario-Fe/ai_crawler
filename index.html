@@ -12,7 +12,8 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
@@ -133,12 +134,19 @@
 
         .news-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            /* grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); */ /* Vecchio layout */
+            grid-template-columns: 1fr; /* Layout a colonna singola per i "post del blog" */
             gap: 25px;
             margin-bottom: 30px;
         }
 
-        .source-box {
+        /* Stili per .source-box e .source-header rimossi perché non più usati direttamente */
+        /* .source-box { ... } */
+        /* .source-header { ... } */
+        /* .source-title { ... } */
+        /* .source-count { ... } */
+
+        .news-item-box { /* Nuovo stile per il box di ogni singola notizia */
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
             padding: 25px;
@@ -146,57 +154,39 @@
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
             border: 1px solid rgba(255,255,255,0.2);
+            /* margin-bottom: 25px; */ /* Non necessario se .news-grid ha gap */
         }
 
-        .source-box:hover {
+        .news-item-box:hover {
             transform: translateY(-5px);
             box-shadow: 0 25px 45px rgba(0,0,0,0.15);
         }
-
-        .source-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f3f4f6;
+        
+        .news-item-source-header { /* Header per la fonte all'interno del box notizia */
+            margin-bottom: 15px; 
+            padding-bottom: 10px; 
+            border-bottom: 1px solid #e5e7eb; 
         }
 
-        .source-title {
-            font-size: 1.3em;
+        .news-item-source-title { /* Titolo della fonte */
+            font-size: 1.1em; 
             font-weight: 700;
-            color: #374151;
+            /* Il colore viene applicato inline dallo script */
+            margin-bottom: 3px;
         }
-
-        .source-count {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            padding: 5px 12px;
-            border-radius: 15px;
-            font-size: 0.9em;
-            font-weight: 600;
+        
+        .news-item-source-description { /* Descrizione della fonte */
+            font-size: 0.85em;
+            font-weight: normal;
+            color: #6b7280;
         }
-
-        .news-item {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-left: 4px solid #667eea;
-            transition: all 0.3s ease;
-        }
-
-        .news-item:hover {
-            background: #f1f5f9;
-            transform: translateX(5px);
-        }
-
-        .news-item:last-child {
-            margin-bottom: 0;
+        
+        .news-content-wrapper { /* Wrapper per titolo, sommario, meta sotto l'header della fonte */
+            /* Rimosso margin-top, gestito dal padding del box e margin-bottom dell'header della fonte */
         }
 
         .news-title {
-            font-size: 1.1em;
+            font-size: 1.2em; 
             font-weight: 600;
             color: #1f2937;
             margin-bottom: 10px;
@@ -283,14 +273,14 @@
 
         @media (max-width: 768px) {
             .news-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr; 
             }
-            
+
             .controls {
                 flex-direction: column;
                 text-align: center;
             }
-            
+
             .search-box {
                 max-width: 100%;
             }
@@ -309,11 +299,11 @@
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Pronto</span>
             </div>
-            
+
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="🔍 Cerca nelle notizie...">
             </div>
-            
+
             <div>
                 <button class="btn" onclick="updateNews()">
                     🔄 Aggiorna Ora
@@ -325,14 +315,15 @@
         </div>
 
         <div id="newsContainer" class="news-grid">
+            <!-- Le notizie verranno caricate qui -->
             <div class="loading">
                 Caricamento delle notizie AI in corso...
             </div>
         </div>
 
         <div class="footer">
-            <p>🚀 Creato per monitorare l'evoluzione dell'AI | 
-            <a href="https://github.com" target="_blank">Disponibile su GitHub</a> | 
+            <p>🚀 Creato per monitorare l'evoluzione dell'AI |
+            <a href="https://github.com/Dario-Fe/ai_crawler" target="_blank">Disponibile su GitHub</a> |
             Ultimo aggiornamento: <span id="lastUpdate">Mai</span></p>
         </div>
     </div>
@@ -399,148 +390,93 @@
         const newsCache = new Map();
         const CACHE_DURATION = 15 * 60 * 1000; // 15 minuti
 
-        // Funzione per tradurre testo (simulata - in produzione usare Google Translate API)
+        // Funzione per tradurre testo (simulata)
         function translateToItalian(text) {
-            // Traduzioni di base per termini comuni AI
             const translations = {
-                'artificial intelligence': 'intelligenza artificiale',
-                'machine learning': 'apprendimento automatico',
-                'deep learning': 'apprendimento profondo',
-                'neural network': 'rete neurale',
-                'natural language processing': 'elaborazione del linguaggio naturale',
-                'computer vision': 'visione artificiale',
-                'breakthrough': 'svolta',
-                'algorithm': 'algoritmo',
-                'dataset': 'set di dati',
-                'model': 'modello',
-                'training': 'addestramento',
-                'inference': 'inferenza',
-                'GPT': 'GPT',
-                'OpenAI': 'OpenAI',
-                'Google': 'Google',
-                'Microsoft': 'Microsoft',
-                'AI': 'IA'
+                'artificial intelligence': 'intelligenza artificiale', 'machine learning': 'apprendimento automatico',
+                'deep learning': 'apprendimento profondo', 'neural network': 'rete neurale',
+                'natural language processing': 'elaborazione del linguaggio naturale', 'computer vision': 'visione artificiale',
+                'breakthrough': 'svolta', 'algorithm': 'algoritmo', 'dataset': 'set di dati',
+                'model': 'modello', 'training': 'addestramento', 'inference': 'inferenza',
+                'GPT': 'GPT', 'OpenAI': 'OpenAI', 'Google': 'Google', 'Microsoft': 'Microsoft', 'AI': 'IA'
             };
-            
             let translatedText = text;
-            for (const [english, italian] of Object.entries(translations)) {
-                translatedText = translatedText.replace(new RegExp(english, 'gi'), italian);
+            if (typeof text === 'string') {
+                for (const [english, italian] of Object.entries(translations)) {
+                    translatedText = translatedText.replace(new RegExp(english, 'gi'), italian);
+                }
             }
-            
             return translatedText;
         }
 
-        // Funzione per pulire e riassumere il contenuto
         function generateSummary(content, maxLength = 200) {
             if (!content) return 'Contenuto non disponibile';
-            
-            // Rimuovi HTML tags
             const cleanContent = content.replace(/<[^>]*>/g, '');
-            
-            // Tronca se troppo lungo
-            if (cleanContent.length <= maxLength) {
-                return translateToItalian(cleanContent);
-            }
-            
-            // Trova la fine della frase più vicina al limite
+            if (cleanContent.length <= maxLength) return translateToItalian(cleanContent);
             const truncated = cleanContent.substring(0, maxLength);
-            const lastSentence = truncated.lastIndexOf('.');
-            const lastExclamation = truncated.lastIndexOf('!');
-            const lastQuestion = truncated.lastIndexOf('?');
-            
-            const endPoint = Math.max(lastSentence, lastExclamation, lastQuestion);
-            
-            if (endPoint > maxLength * 0.7) {
-                return translateToItalian(truncated.substring(0, endPoint + 1));
-            }
-            
+            const endPoint = Math.max(truncated.lastIndexOf('.'), truncated.lastIndexOf('!'), truncated.lastIndexOf('?'));
+            if (endPoint > maxLength * 0.7) return translateToItalian(truncated.substring(0, endPoint + 1));
             return translateToItalian(truncated + '...');
         }
 
-        // Funzione per caricare notizie da RSS
         async function loadRealNews() {
             if (isUpdating) return;
-            
             isUpdating = true;
             updateStatus('updating', 'Caricamento notizie AI...');
-            
             const allArticles = [];
             const promises = [];
-
             for (const [sourceName, sourceConfig] of Object.entries(AI_SOURCES)) {
-                const cacheKey = `${sourceName}-${Date.now()}`;
-                
-                // Controlla cache
                 const cached = newsCache.get(sourceName);
                 if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
                     allArticles.push(...cached.articles);
                     continue;
                 }
-
                 const promise = fetch(sourceConfig.rss)
                     .then(response => response.json())
                     .then(data => {
                         const articles = [];
-                        
                         if (data.status === 'ok' && data.items) {
-                            data.items.slice(0, 5).forEach(item => { // Limita a 5 articoli per fonte
+                            data.items.slice(0, 5).forEach(item => {
                                 const article = {
                                     title: translateToItalian(item.title || 'Titolo non disponibile'),
                                     summary: generateSummary(item.description || item.content),
                                     url: item.link || sourceConfig.url,
                                     timestamp: item.pubDate || new Date().toISOString(),
                                     source: sourceName,
-                                    color: sourceConfig.color,
-                                    category: detectCategory(item.title + ' ' + (item.description || ''))
+                                    // color: sourceConfig.color, // Non più necessario sull'articolo, preso da AI_SOURCES in renderNews
+                                    // description: sourceConfig.description, // Non più necessario sull'articolo
+                                    category: detectCategory(item.title + ' ' + (item.description || item.content || ''))
                                 };
                                 articles.push(article);
                             });
                         }
-                        
-                        // Salva in cache
-                        newsCache.set(sourceName, {
-                            articles: articles,
-                            timestamp: Date.now()
-                        });
-                        
+                        newsCache.set(sourceName, { articles: articles, timestamp: Date.now() });
                         return articles;
                     })
                     .catch(error => {
                         console.warn(`Errore nel caricamento di ${sourceName}:`, error);
-                        
-                        // Fallback con dati di esempio se RSS non funziona
-                        return generateFallbackNews(sourceName, sourceConfig);
+                        return generateFallbackNews(sourceName, sourceConfig); // sourceConfig passato qui
                     });
-
                 promises.push(promise);
             }
-
             try {
                 const results = await Promise.all(promises);
                 results.forEach(articles => allArticles.push(...articles));
-                
-                // Ordina per data
                 allArticles.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
                 allNews = allArticles;
                 filteredNews = [...allNews];
-                
                 renderNews();
                 updateStatus('ready', `${allNews.length} notizie caricate`);
                 updateLastUpdateTime();
-                
             } catch (error) {
                 console.error('Errore generale nel caricamento:', error);
                 updateStatus('error', 'Errore nel caricamento');
-                
-                // Carica dati di fallback
                 loadFallbackNews();
             } finally {
                 isUpdating = false;
             }
         }
 
-        // Funzione per rilevare la categoria
         function detectCategory(text) {
             const categories = {
                 'ricerca': ['research', 'paper', 'study', 'ricerca', 'studio'],
@@ -549,88 +485,38 @@
                 'startup': ['startup', 'funding', 'investment', 'finanziamento'],
                 'tech': ['technology', 'innovation', 'breakthrough', 'tecnologia', 'innovazione']
             };
-            
             const lowerText = text.toLowerCase();
             for (const [category, keywords] of Object.entries(categories)) {
-                if (keywords.some(keyword => lowerText.includes(keyword))) {
-                    return category;
-                }
+                if (keywords.some(keyword => lowerText.includes(keyword))) return category;
             }
             return 'generale';
         }
 
-        // Fallback con dati di esempio migliorati
-        function generateFallbackNews(sourceName, sourceConfig) {
-            const sampleNews = {
-                'TLDR AI': [
-                    {
-                        title: 'OpenAI presenta GPT-4.5 con ragionamento avanzato',
-                        summary: 'Il nuovo modello di linguaggio GPT-4.5 introduce capacità di ragionamento significativamente migliorate, con prestazioni superiori del 40% nei test di logica e comprensione del contesto rispetto alla versione precedente.',
-                        url: 'https://tldr.tech/ai/gpt45-release',
-                        timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
-                        category: 'prodotti'
-                    }
-                ],
-                'AI News Italia': [
-                    {
-                        title: 'L\'UE approva il regolamento sull\'IA etica',
-                        summary: 'Il Parlamento Europeo ha approvato definitivamente il regolamento per l\'uso etico dell\'intelligenza artificiale, stabilendo nuovi standard di trasparenza e protezione dei dati per le aziende tecnologiche.',
-                        url: 'https://ainews.it/regolamento-ue-ia',
-                        timestamp: new Date(Date.now() - 4 * 3600000).toISOString(),
-                        category: 'normative'
-                    }
-                ],
-                'The Neuron': [
-                    {
-                        title: 'Rivoluzione nell\'hardware IA: nuovo chip neurale',
-                        summary: 'Un nuovo processore specializzato per l\'intelligenza artificiale promette di accelerare i calcoli IA di 10 volte rispetto ai chip tradizionali, aprendo nuove possibilità per l\'elaborazione locale.',
-                        url: 'https://theneuron.ai/neural-chip-breakthrough',
-                        timestamp: new Date(Date.now() - 1 * 3600000).toISOString(),
-                        category: 'tech'
-                    }
-                ],
-                'Ben\'s Bites': [
-                    {
-                        title: 'IA generativa raggiunge nuovi livelli artistici',
-                        summary: 'I più recenti modelli di generazione artistica dimostrano capacità straordinarie nel creare opere fotorealistiche e stilizzate, con miglioramenti significativi nella coerenza e qualità visiva.',
-                        url: 'https://news.bensbites.com/ai-art-breakthrough',
-                        timestamp: new Date(Date.now() - 6 * 3600000).toISOString(),
-                        category: 'prodotti'
-                    }
-                ],
-                'The Rundown AI': [
-                    {
-                        title: 'Agenti IA rivoluzionano il servizio clienti',
-                        summary: 'I nuovi agenti di intelligenza artificiale gestiscono conversazioni complesse con i clienti, riducendo i tempi di risposta del 70% e aumentando la soddisfazione complessiva del servizio.',
-                        url: 'https://therundown.ai/ai-customer-service',
-                        timestamp: new Date(Date.now() - 8 * 3600000).toISOString(),
-                        category: 'tech'
-                    }
-                ]
+        function generateFallbackNews(sourceName, sourceConfig) { // sourceConfig ricevuto come parametro
+             const sampleNewsBase = {
+                'TLDR AI': { title: 'OpenAI presenta GPT-4.5', summary: 'Nuovo modello con ragionamento avanzato.', url: '#', category: 'prodotti'},
+                'AI News Italia': { title: 'L\'UE approva regolamento IA', summary: 'Nuovi standard etici per l\'IA.', url: '#', category: 'normative'},
             };
-            
-            const articles = sampleNews[sourceName] || [];
-            return articles.map(article => ({
-                ...article,
+            const base = sampleNewsBase[sourceName] || { title: `Notizia fallback da ${sourceName}`, summary: 'Dettagli non disponibili.', url: '#', category: 'generale'};
+            return [{
+                ...base,
+                timestamp: new Date().toISOString(),
                 source: sourceName,
-                color: sourceConfig.color
-            }));
+                // color: sourceConfig.color, // Non necessario qui
+                // description: sourceConfig.description // Non necessario qui
+            }];
         }
 
         function loadFallbackNews() {
             const fallbackArticles = [];
-            
-            for (const [sourceName, sourceConfig] of Object.entries(AI_SOURCES)) {
-                const articles = generateFallbackNews(sourceName, sourceConfig);
-                fallbackArticles.push(...articles);
+            for (const [sourceName, sourceConfig] of Object.entries(AI_SOURCES)) { // sourceConfig è disponibile qui
+                fallbackArticles.push(...generateFallbackNews(sourceName, sourceConfig));
             }
-            
             allNews = fallbackArticles;
             filteredNews = [...allNews];
             renderNews();
         }
 
-        // Inizializzazione
         document.addEventListener('DOMContentLoaded', function() {
             loadRealNews();
             setupSearch();
@@ -638,73 +524,57 @@
             setupNotifications();
         });
 
-        function loadNews() {
-            loadRealNews();
-        }
+        function loadNews() { loadRealNews(); }
 
         function renderNews() {
             const container = document.getElementById('newsContainer');
-            const sourceGroups = {};
-            
-            // Raggruppa per fonte
-            filteredNews.forEach(article => {
-                if (!sourceGroups[article.source]) {
-                    sourceGroups[article.source] = [];
-                }
-                sourceGroups[article.source].push(article);
-            });
-            
             let html = '';
-            for (const [source, articles] of Object.entries(sourceGroups)) {
-                const sourceConfig = AI_SOURCES[source];
-                html += `
-                    <div class="source-box">
-                        <div class="source-header">
-                            <div class="source-title" style="color: ${sourceConfig.color}">
-                                ${source}
-                                <div style="font-size: 0.8em; font-weight: normal; color: #6b7280; margin-top: 5px;">
-                                    ${sourceConfig.description}
-                                </div>
-                            </div>
-                            <div class="source-count">
-                                ${articles.length} notizie
-                            </div>
-                        </div>
-                        <div class="news-list">
-                            ${articles.map(article => `
-                                <div class="news-item">
-                                    <div class="news-title">${article.title}</div>
-                                    <div class="news-summary">${article.summary}</div>
-                                    <div class="news-meta">
-                                        <span>
-                                            ${formatTimestamp(article.timestamp)}
-                                            ${article.category ? `• <span style="color: ${sourceConfig.color}; font-weight: 600;">${article.category}</span>` : ''}
-                                        </span>
-                                        <a href="${article.url}" target="_blank" class="news-link">
-                                            Leggi di più →
-                                        </a>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            if (html === '') {
+
+            if (filteredNews.length === 0) {
                 html = `
                     <div class="error-message">
                         <h3>Nessuna notizia trovata</h3>
                         <p>Prova a modificare i filtri di ricerca o aggiorna le notizie.</p>
                     </div>
                 `;
+            } else {
+                filteredNews.forEach(article => {
+                    // Accedi a color e description direttamente da AI_SOURCES usando article.source
+                    const sourceConfig = AI_SOURCES[article.source]; 
+                    const sourceColor = sourceConfig ? sourceConfig.color : '#333'; // Colore di fallback
+                    const sourceDescription = sourceConfig ? sourceConfig.description : ''; // Descrizione di fallback
+
+                    html += `
+                        <div class="news-item-box">
+                            <div class="news-item-source-header">
+                                <div class="news-item-source-title" style="color: ${sourceColor}">
+                                    ${article.source}
+                                </div>
+                                <div class="news-item-source-description">
+                                    ${sourceDescription}
+                                </div>
+                            </div>
+                            <div class="news-content-wrapper">
+                                <div class="news-title">${article.title}</div>
+                                <div class="news-summary">${article.summary}</div>
+                                <div class="news-meta">
+                                    <span>
+                                        ${formatTimestamp(article.timestamp)}
+                                        ${article.category ? `• <span style="color: ${sourceColor}; font-weight: 600;">${article.category}</span>` : ''}
+                                    </span>
+                                    <a href="${article.url}" target="_blank" class="news-link">
+                                        Leggi di più →
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
             }
-            
             container.innerHTML = html;
         }
 
         function setupNotifications() {
-            // Richiedi permesso per le notifiche
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
             }
@@ -724,13 +594,13 @@
             const searchInput = document.getElementById('searchInput');
             searchInput.addEventListener('input', function() {
                 const query = this.value.toLowerCase();
-                if (query.trim() === '') {
+                if (query.trim() === '') { // Se la ricerca è vuota, mostra tutte le notizie
                     filteredNews = [...allNews];
                 } else {
-                    filteredNews = allNews.filter(article => 
-                        article.title.toLowerCase().includes(query) ||
-                        article.summary.toLowerCase().includes(query) ||
-                        article.source.toLowerCase().includes(query)
+                    filteredNews = allNews.filter(article =>
+                        (article.title && article.title.toLowerCase().includes(query)) ||
+                        (article.summary && article.summary.toLowerCase().includes(query)) ||
+                        (article.source && article.source.toLowerCase().includes(query))
                     );
                 }
                 renderNews();
@@ -738,19 +608,15 @@
         }
 
         function setupAutoUpdate() {
-            // Aggiorna ogni 30 minuti
-            updateInterval = setInterval(() => {
-                loadNews();
-            }, 30 * 60 * 1000);
+            updateInterval = setInterval(loadNews, 30 * 60 * 1000);
         }
 
         function updateNews() {
             if (!isUpdating) {
                 const previousCount = allNews.length;
                 loadRealNews().then(() => {
-                    const newCount = allNews.length;
-                    if (newCount > previousCount) {
-                        showNotification('🤖 Nuove notizie AI!', `${newCount - previousCount} nuove notizie disponibili`);
+                    if (allNews.length > previousCount) {
+                        showNotification('🤖 Nuove notizie AI!', `${allNews.length - previousCount} nuove notizie disponibili`);
                     }
                 });
             }
@@ -761,33 +627,27 @@
                 exported_at: new Date().toISOString(),
                 total_articles: allNews.length,
                 sources: Object.keys(AI_SOURCES),
-                articles: allNews.map(article => ({
+                articles: allNews.map(article => ({ 
                     title: article.title,
                     summary: article.summary,
                     url: article.url,
                     source: article.source,
                     category: article.category,
                     timestamp: article.timestamp
-                }))
+                 }))
             };
-            
             const dataStr = JSON.stringify(exportData, null, 2);
             const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-            
-            const exportFileDefaultName = `ai_news_export_${new Date().toISOString().split('T')[0]}.json`;
-            
             const linkElement = document.createElement('a');
             linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.setAttribute('download', `ai_news_export_${new Date().toISOString().split('T')[0]}.json`);
             linkElement.click();
-            
-            showNotification('📥 Esportazione completata', `${allNews.length} notizie esportate in formato JSON`);
+            showNotification('📥 Esportazione completata', `${allNews.length} notizie esportate.`);
         }
 
         function updateStatus(status, text) {
             const indicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
-            
             indicator.className = `status-indicator ${status}`;
             statusText.textContent = text;
         }
@@ -799,22 +659,14 @@
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp);
             const now = new Date();
-            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-            
-            if (diffInHours < 1) {
-                return 'Meno di un\'ora fa';
-            } else if (diffInHours < 24) {
-                return `${diffInHours} ore fa`;
-            } else {
-                return date.toLocaleDateString('it-IT');
-            }
+            const diffInHours = Math.floor((now - date) / (3600000));
+            if (diffInHours < 1) return 'Meno di un\'ora fa';
+            if (diffInHours < 24) return `${diffInHours} ore fa`;
+            return date.toLocaleDateString('it-IT');
         }
 
-        // Cleanup quando la pagina viene chiusa
         window.addEventListener('beforeunload', function() {
-            if (updateInterval) {
-                clearInterval(updateInterval);
-            }
+            if (updateInterval) clearInterval(updateInterval);
         });
     </script>
 </body>
