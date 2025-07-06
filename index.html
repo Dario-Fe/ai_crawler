@@ -399,6 +399,27 @@
         const newsCache = new Map();
         const CACHE_DURATION = 15 * 60 * 1000; // 15 minuti
 
+        // Helper function to escape HTML special characters (moved globally)
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') {
+                // Attempt to convert to string if it's a simple type, otherwise return empty
+                if (unsafe === null || unsafe === undefined || typeof unsafe === 'object') {
+                    return '';
+                }
+                try {
+                    unsafe = String(unsafe);
+                } catch (e) {
+                    return '';
+                }
+            }
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
         // Funzione per tradurre testo (simulata - in produzione usare Google Translate API)
         function translateToItalian(text) {
             // Traduzioni di base per termini comuni AI
@@ -498,43 +519,71 @@
                         }
                         
                         // Salva in cache
-                        newsCache.set(sourceName, {
+                        newsCache.set(sourceName, { // Cache solo gli articoli validi
                             articles: articles,
                             timestamp: Date.now()
                         });
-                        
-                        return articles;
+                        // Ritorna la struttura completa per il successo
+                        return { sourceName, articles, error: null, hasError: false };
                     })
                     .catch(error => {
                         console.warn(`Errore nel caricamento di ${sourceName}:`, error);
-                        
-                        // Fallback con dati di esempio se RSS non funziona
-                        return generateFallbackNews(sourceName, sourceConfig);
+                        // Ritorna la struttura completa per l'errore, con fallback
+                        return {
+                            sourceName,
+                            articles: generateFallbackNews(sourceName, sourceConfig),
+                            error: error.message || 'Errore sconosciuto durante il fetch',
+                            hasError: true
+                        };
                     });
 
                 promises.push(promise);
             }
 
             try {
-                const results = await Promise.all(promises);
-                results.forEach(articles => allArticles.push(...articles));
+                const results = await Promise.all(promises); // results è ora un array di {sourceName, articles, error, hasError}
                 
-                // Ordina per data
-                allArticles.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                window.sourceResults = results; // Salva i risultati completi per renderNews
+
+                allNews = []; // Resetta allNews
+                results.forEach(result => {
+                    // Aggiungi a allNews solo gli articoli (reali o di fallback)
+                    // La distinzione tra reale e fallback avverrà in renderNews basandosi su result.hasError
+                    if (result && Array.isArray(result.articles)) {
+                        result.articles.forEach(article => {
+                            allNews.push({
+                                ...article,
+                                source: result.sourceName // Assicura che la fonte sia corretta sull'oggetto articolo
+                            });
+                        });
+                    }
+                });
                 
-                allNews = allArticles;
-                filteredNews = [...allNews];
+                allNews.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                filteredNews = [...allNews]; // Inizializza filteredNews
                 
-                renderNews();
-                updateStatus('ready', `${allNews.length} notizie caricate`);
+                renderNews(); // Chiama renderNews dopo che tutti i dati sono pronti
+
+                const sourcesWithErrors = results.filter(r => r.hasError).length;
+                const totalSources = Object.keys(AI_SOURCES).length;
+                let statusMessage = `${allNews.length} notizie (incl. fallback) caricate.`;
+                if (sourcesWithErrors > 0) {
+                    statusMessage = `${allNews.length} notizie caricate. Problemi con ${sourcesWithErrors}/${totalSources} fonti.`;
+                }
+                updateStatus('ready', statusMessage);
                 updateLastUpdateTime();
                 
-            } catch (error) {
-                console.error('Errore generale nel caricamento:', error);
-                updateStatus('error', 'Errore nel caricamento');
-                
-                // Carica dati di fallback
-                loadFallbackNews();
+            } catch (error) { // Questo catch è per errori imprevisti in Promise.all o nella logica try
+                console.error('Errore generale nel blocco try di loadRealNews:', error);
+                updateStatus('error', 'Errore critico nel caricamento');
+                // Potrebbe essere necessario un fallback più globale qui se results non è popolato
+                window.sourceResults = Object.keys(AI_SOURCES).map(name => ({
+                    sourceName: name,
+                    articles: generateFallbackNews(name, AI_SOURCES[name]),
+                    error: 'Errore critico generale',
+                    hasError: true
+                }));
+                loadFallbackNews(); // Questo potrebbe sovrascrivere allNews e filteredNews, poi chiama renderNews
             } finally {
                 isUpdating = false;
             }
@@ -644,54 +693,108 @@
 
         function renderNews() {
             const container = document.getElementById('newsContainer');
-            const sourceGroups = {};
-            
-            // Raggruppa per fonte
-            filteredNews.forEach(article => {
-                if (!sourceGroups[article.source]) {
-                    sourceGroups[article.source] = [];
-                }
-                sourceGroups[article.source].push(article);
-            });
-            
             let html = '';
-            for (const [source, articles] of Object.entries(sourceGroups)) {
-                const sourceConfig = AI_SOURCES[source];
+
+            // Dati necessari, con fallback se non ancora pronti o non array
+            const resultsToRender = Array.isArray(window.sourceResults) ? window.sourceResults : [];
+            const currentFilteredNews = Array.isArray(filteredNews) ? filteredNews : [];
+            const currentAllNews = Array.isArray(allNews) ? allNews : [];
+            const searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+
+            if (resultsToRender.length === 0 && searchQuery === '') {
+                // Se non ci sono fonti da renderizzare (es. AI_SOURCES è vuoto o tutte le fonti hanno fallito catastroficamente prima)
+                // e non c'è una ricerca attiva che potrebbe causare 0 risultati.
+                container.innerHTML = `<div class="loading">Nessuna fonte di notizie configurata o caricamento iniziale fallito.</div>`;
+                return;
+            }
+
+            for (const result of resultsToRender) {
+                const sourceName = result.sourceName || 'Fonte Sconosciuta';
+                const sourceConfig = AI_SOURCES[sourceName] || {}; // Fallback a oggetto vuoto
+                const sourceColor = sourceConfig.color || '#333333'; // Colore di fallback
+                const sourceDescription = sourceConfig.description || 'Nessuna descrizione.';
+
+                // Articoli originali dalla fonte (potrebbero essere di fallback se c'è stato un errore)
+                const originalArticlesFromSource = Array.isArray(result.articles) ? result.articles : [];
+                const error = result.error; // Stringa o null
+                const hasError = result.hasError; // Boolean
+
+                // Filtra gli articoli per la fonte corrente in base alla ricerca globale (currentFilteredNews)
+                const articlesToDisplay = currentFilteredNews.filter(article => article.source === sourceName);
+
+                // Se c'è una ricerca attiva e questa fonte non ha articoli corrispondenti (articlesToDisplay è vuoto),
+                // E non ha errori (altrimenti vogliamo mostrare l'errore), allora potremmo saltare il rendering di questa fonte.
+                // Tuttavia, per coerenza, mostriamo sempre il box della fonte, ma indicherà 0 notizie se filtrato.
+
                 html += `
                     <div class="source-box">
                         <div class="source-header">
-                            <div class="source-title" style="color: ${sourceConfig.color}">
-                                ${source}
+                            <div class="source-title" style="color: ${escapeHtml(sourceColor)}">
+                                ${escapeHtml(sourceName)}
                                 <div style="font-size: 0.8em; font-weight: normal; color: #6b7280; margin-top: 5px;">
-                                    ${sourceConfig.description}
+                                    ${escapeHtml(sourceDescription)}
                                 </div>
                             </div>
                             <div class="source-count">
-                                ${articles.length} notizie
+                                ${articlesToDisplay.length} notizie ${hasError ? '<span style="color: #dc2626;">(problemi)</span>' : ''}
                             </div>
-                        </div>
-                        <div class="news-list">
-                            ${articles.map(article => `
-                                <div class="news-item">
-                                    <div class="news-title">${article.title}</div>
-                                    <div class="news-summary">${article.summary}</div>
-                                    <div class="news-meta">
-                                        <span>
-                                            ${formatTimestamp(article.timestamp)}
-                                            ${article.category ? `• <span style="color: ${sourceConfig.color}; font-weight: 600;">${article.category}</span>` : ''}
-                                        </span>
-                                        <a href="${article.url}" target="_blank" class="news-link">
-                                            Leggi di più →
-                                        </a>
+                        </div>`;
+
+                if (hasError) {
+                    html += `<div class="news-item" style="border-left-color: #ef4444;">
+                                <p style="color: #dc2626; font-weight: bold;">Impossibile caricare aggiornamenti da questa fonte.</p>`;
+                    if (error) {
+                        html += `<p style="color: #ef4444; font-size: 0.9em;">Dettaglio: ${escapeHtml(error)}</p>`;
+                    }
+                    // Mostra messaggio sui dati di fallback solo se ci sono effettivamente articoli di fallback *E* sono visualizzati
+                    if (originalArticlesFromSource.length > 0 && articlesToDisplay.length > 0) {
+                        html += `<p style="font-style: italic; font-size: 0.9em; color: #6b7280;">Vengono mostrati dati di esempio o precedentemente memorizzati.</p>`;
+                    }
+                    html += `</div>`;
+                }
+
+                if (articlesToDisplay.length > 0) {
+                    html += `<div class="news-list">
+                                ${articlesToDisplay.map(article => `
+                                    <div class="news-item">
+                                        <div class="news-title">${escapeHtml(article.title)}</div>
+                                        <div class="news-summary">${article.summary}</div> {/* Summary è già html sicuro o testo semplice */}
+                                        <div class="news-meta">
+                                            <span>
+                                                ${formatTimestamp(article.timestamp)}
+                                                ${article.category ? `• <span style="color: ${escapeHtml(sourceColor)}; font-weight: 600;">${escapeHtml(article.category)}</span>` : ''}
+                                            </span>
+                                            <a href="${escapeHtml(article.url)}" target="_blank" class="news-link">
+                                                Leggi di più →
+                                            </a>
+                                        </div>
                                     </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
+                                `).join('')}
+                            </div>`;
+                } else if (!hasError && originalArticlesFromSource.length === 0) {
+                    // Nessun errore, ma la fonte è genuinamente vuota (0 articoli originali)
+                    html += `<div class="news-item"><p>Nessuna notizia disponibile da questa fonte al momento.</p></div>`;
+                } else if (!hasError && searchQuery !== '' && articlesToDisplay.length === 0) {
+                    // Nessun errore, c'è una ricerca, ma questa fonte non ha risultati per la ricerca
+                    html += `<div class="news-item"><p>Nessuna notizia da questa fonte corrisponde alla tua ricerca.</p></div>`;
+                }
+                html += `</div>`; // Chiude source-box
+            }
+
+            // Se dopo aver iterato tutte le fonti, html è ancora vuoto (es. tutte le fonti filtrate via dalla ricerca)
+            // O se non ci sono filteredNews E c'è una ricerca attiva
+            if (html === '' || (currentFilteredNews.length === 0 && searchQuery !== '')) {
+                 html = `
+                    <div class="error-message">
+                        <h3>Nessuna notizia trovata</h3>
+                        <p>La tua ricerca '${escapeHtml(searchQuery)}' non ha prodotto risultati. Prova con termini diversi o <a href="#" onclick="document.getElementById('searchInput').value=''; updateNews(); return false;">rimuovi il filtro</a>.</p>
+                    </div>`;
             }
             
-            if (html === '') {
+            container.innerHTML = html;
+        }
+
+        function setupNotifications() {
                 html = `
                     <div class="error-message">
                         <h3>Nessuna notizia trovata</h3>
