@@ -333,7 +333,7 @@ Oxygen, Ubuntu, Cantarell, sans-serif;
         const AI_SOURCES = {
             'TLDR AI': {
                 url: 'https://tldr.tech/ai',
-                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://tldr.tech/ai/rss',
+                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://bullrich.dev/tldr-rss/ai.rss',
                 color: '#667eea',
                 description: 'Daily AI newsletter with byte-sized updates'
             },
@@ -357,7 +357,7 @@ Oxygen, Ubuntu, Cantarell, sans-serif;
             },
             'The Rundown AI': {
                 url: 'https://www.therundown.ai',
-                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://www.therundown.ai/feed',
+                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml',
                 color: '#ef4444',
                 description: 'Daily AI insights for 1M+ readers'
             },
@@ -369,7 +369,7 @@ Oxygen, Ubuntu, Cantarell, sans-serif;
             },
             'Google AI Blog': {
                 url: 'https://ai.googleblog.com',
-                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://ai.googleblog.com/feeds/posts/default',
+                rss: 'https://api.rss2json.com/v1/api.json?rss_url=https://research.google/blog/rss/',
                 color: '#4285f4',
                 description: 'Google AI research and developments'
             },
@@ -493,28 +493,44 @@ Oxygen, Ubuntu, Cantarell, sans-serif;
         }
 
         function generateFallbackNews(sourceName, sourceConfig) { // sourceConfig ricevuto come parametro
-             const sampleNewsBase = {
-                'TLDR AI': { title: 'OpenAI presenta GPT-4.5', summary: 'Nuovo modello con ragionamento avanzato.', url: '#', category: 'prodotti'},
-                'AI News Italia': { title: 'L\'UE approva regolamento IA', summary: 'Nuovi standard etici per l\'IA.', url: '#', category: 'normative'},
-            };
-            const base = sampleNewsBase[sourceName] || { title: `Notizia fallback da ${sourceName}`, summary: 'Dettagli non disponibili.', url: '#', category: 'generale'};
+            // Rimuoviamo sampleNewsBase, generiamo un fallback specifico per la fonte.
+            const fallbackTitle = `Notizie da ${sourceName} non disponibili`;
+            const fallbackSummary = `Impossibile caricare le notizie da ${sourceName} in questo momento. Controllare lo stato della fonte o riprovare più tardi.`;
+            
             return [{
-                ...base,
+                title: fallbackTitle,
+                summary: fallbackSummary,
+                url: sourceConfig.url, // Usiamo l'URL base della fonte per il link "Leggi di più"
                 timestamp: new Date().toISOString(),
                 source: sourceName,
-                // color: sourceConfig.color, // Non necessario qui
-                // description: sourceConfig.description // Non necessario qui
+                category: 'fallback', // Categoria specifica per fallback
+                isFallback: true // Proprietà per identificare facilmente un articolo di fallback
             }];
         }
 
         function loadFallbackNews() {
+            // Questa funzione ora non è più necessaria se gestiamo i fallback individualmente
+            // all'interno di loadRealNews. Se Promise.all fallisce completamente,
+            // potremmo voler mostrare un messaggio di errore generale piuttosto che riempire con fallback.
+            // Per ora la commento, la gestione degli errori in loadRealNews dovrebbe essere sufficiente.
+            /*
             const fallbackArticles = [];
-            for (const [sourceName, sourceConfig] of Object.entries(AI_SOURCES)) { // sourceConfig è disponibile qui
+            for (const [sourceName, sourceConfig] of Object.entries(AI_SOURCES)) {
                 fallbackArticles.push(...generateFallbackNews(sourceName, sourceConfig));
             }
             allNews = fallbackArticles;
             filteredNews = [...allNews];
             renderNews();
+            */
+           // Invece, mostriamo un errore più generico se Promise.all fallisce catastroficamente
+           const container = document.getElementById('newsContainer');
+           container.innerHTML = `
+                <div class="error-message">
+                    <h3>Errore Generale nel Caricamento delle Notizie</h3>
+                    <p>Si è verificato un problema imprevisto durante il tentativo di caricare le notizie. Riprova più tardi.</p>
+                </div>`;
+            updateStatus('error', 'Errore generale nel caricamento');
+
         }
 
         document.addEventListener('DOMContentLoaded', function() {
